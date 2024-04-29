@@ -8,3 +8,8 @@
 
 See https://github.com/g0orx/T41-EP/wiki
 
+## Further changes by KI3P to add basic V12 support:
+
+### K9HZ LPF board
+### V12 BPF board
+### Shutdown routine
