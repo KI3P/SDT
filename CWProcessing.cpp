@@ -349,7 +349,7 @@ void SetSideToneVolume() {
   modeSelectOutR.gain(0, 0);
   modeSelectOutExL.gain(0, 0);
   modeSelectOutExR.gain(0, 0);
-  digitalWrite(MUTE, LOW);      // unmutes audio
+  //digitalWrite(MUTE, LOW);      // unmutes audio // KI3P
   modeSelectOutL.gain(1, 0.0);  // Sidetone  AFP 10-01-22
   modeSelectOutR.gain(1, 0.0);  // Sidetone  AFP 10-01-22
 

@@ -11,7 +11,8 @@
 
 // Enable weak pullups
 #define ENABLE_PULLUPS
-
+// KI3P: if defined, reverse direction of encoders
+//#define REVERSE
 
 // Enable this to emit codes twice per step.
 //#define HALF_STEP

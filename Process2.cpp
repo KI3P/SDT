@@ -59,7 +59,7 @@ void CalibratePreamble(int setZoom) {
   userScale = currentScale;  //  Remember user preference so it can be reset when done.  KF5N
   currentScale = 1;          //  Set vertical scale to 10 dB during calibration.  KF5N
   updateDisplayFlag = 0;
-  digitalWrite(MUTE, LOW);  //turn off mute
+  //digitalWrite(MUTE, LOW);  //turn off mute // KI3P
   xrState = RECEIVE_STATE;
   T41State = CW_RECEIVE;
   modeSelectInR.gain(0, 1);
@@ -75,7 +75,7 @@ void CalibratePreamble(int setZoom) {
   centerFreq = TxRxFreq;
   NCOFreq = 0L;
   xrState = TRANSMIT_STATE;
-  digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute)
+  //digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute) // KI3P
   digitalWrite(RXTX, HIGH);  // Turn on transmitter.
   ShowTransmitReceiveStatus();
   ShowSpectrumdBScale();

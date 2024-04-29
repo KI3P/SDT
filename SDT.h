@@ -1,6 +1,8 @@
 #ifndef BEENHERE
 #define BEENHERE
 
+#include <Adafruit_MCP23X17.h> // KI3P
+
 //#define DEBUG_MESSAGES
 
 #ifdef DEBUG_MESSAGES
@@ -11,6 +13,79 @@
 
 // enable for V12 hardware -- G0ORX
 #define V12
+// enable for K9HZ LPF module -- KI3P
+#define K9HZ_LPF  // KI3P
+
+#ifdef V12  // KI3P
+
+  #define BPF_ADDR 0x24
+  #define RF_BOARD_MCP23017_ADDR 0x22
+  extern Adafruit_MCP23X17 mcpBPF; // connected to Wire2
+  extern Adafruit_MCP23X17 mcpRF; // connected to Wire
+  extern uint16_t BPF_GPAB_state;
+
+  #define BEGIN_TEENSY_SHUTDOWN 0
+  #define SHUTDOWN_COMPLETE 1
+  void ShutdownTeensy(void);
+
+  // BPF band definitions
+  #define BPF_BAND_BYPASS 0x0008
+  #define BPF_BAND_6M     0x0004
+  #define BPF_BAND_10M    0x0002
+  #define BPF_BAND_12M    0x0001
+  #define BPF_BAND_15M    0x8000
+  #define BPF_BAND_17M    0x4000
+  #define BPF_BAND_20M    0x2000
+  #define BPF_BAND_30M    0x1000
+  #define BPF_BAND_40M    0x0800
+  #define BPF_BAND_60M    0x0100
+  #define BPF_BAND_80M    0x0400
+  #define BPF_BAND_160M   0x0200
+#endif
+
+#ifdef K9HZ_LPF  // KI3P
+
+  #define K9HZ_LPF_ADDR 0x25  
+  #include "AD7991.h"
+  extern AD7991 swrADC;
+  extern Adafruit_MCP23X17 mcpLPF; // connected to Wire2
+  extern uint8_t LPF_GPB_state;
+  extern uint8_t LPF_GPA_state;
+  
+  // Only uncomment this line if you are KI3P and you have a modified
+  // testing board in your radio
+  #define KI3PMODS
+
+  #ifndef KI3PMODS
+  // The correct LPF band control definitions
+  #define LPF_BAND_NF 0b1111
+  #define LPF_BAND_6M 0b1010
+  #define LPF_BAND_10M 0b1001
+  #define LPF_BAND_12M 0b1000
+  #define LPF_BAND_15M 0b0111
+  #define LPF_BAND_17M 0b0110
+  #define LPF_BAND_20M 0b0101
+  #define LPF_BAND_30M 0b0100
+  #define LPF_BAND_40M 0b0011
+  #define LPF_BAND_60M 0b0000
+  #define LPF_BAND_80M 0b0010
+  #define LPF_BAND_160M 0b0001
+  #else
+  // KI3P's radio only
+  #define LPF_BAND_NF 0b0111
+  #define LPF_BAND_6M 0b0110
+  #define LPF_BAND_10M 0b1111
+  #define LPF_BAND_12M 0b1010
+  #define LPF_BAND_15M 0b1001
+  #define LPF_BAND_17M 0b1000
+  #define LPF_BAND_20M 0b0010
+  #define LPF_BAND_30M 0b0001
+  #define LPF_BAND_40M 0b0101
+  #define LPF_BAND_60M 0b0100
+  #define LPF_BAND_80M 0b0011
+  #define LPF_BAND_160M 0b0000
+  #endif
+#endif
 
 // G0ORX changes by John Melton
 //
@@ -428,7 +503,10 @@ extern struct maps myMapFiles[];
 #define FILTERPIN15M                29    // 15M filter relay
 #define RXTX                        22    // Transmit/Receive
 #define PTT                         37    // Transmit/Receive
-#define MUTE                        38    // Mute Audio,  HIGH = "On" Audio available from Audio PA, LOW = Mute audio
+//#define MUTE                        38    // Mute Audio,  HIGH = "On" Audio available from Audio PA, LOW = Mute audio // KI3P
+#define CAL                         38    // CAL pin. HIGH = Calibration mode. LOW = normal mode.
+#define XMITMODE                    34    // XMit mode. HIGH = SSB. LOW = CW
+#define CWCONT                      33    // CW control. HIGH = CW on. LOW = CW off.
 //========================================= Switch pins
 #define BAND_MENUS                  100    // encoder2 button = button3SW
 #define BAND_PLUS                   101    // BAND+ = button2SW

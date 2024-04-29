@@ -46,9 +46,17 @@ void G0ORX_Rotary::updateA(unsigned char state) {
     cw_fall = false;
     ccw_fall = false;
     if (fwd) {
-      value++;
-    } else {
+      #ifndef REVERSED
       value--;
+      #else
+      value++;
+      #endif
+    } else {
+      #ifndef REVERSED
+      value++;
+      #else
+      value--;
+      #endif
     }
   }
 }
@@ -63,9 +71,17 @@ void G0ORX_Rotary::updateB(unsigned char state) {
     cw_fall = false;
     ccw_fall = false;
     if (fwd) {
-      value--;
-    } else {
+      #ifndef REVERSED
       value++;
+      #else
+      value--;
+      #endif
+    } else {
+      #ifndef REVERSED
+      value--;
+      #else
+      value++;
+      #endif
     }
   }
 }

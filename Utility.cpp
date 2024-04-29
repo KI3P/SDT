@@ -2,6 +2,27 @@
 #include "SDT.h"
 #endif
 
+
+/*****
+  Purpose: Shut down the radio gracefully when informed by the Shutdown circuitry 
+  that the power button has been pressed.
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void ShutdownTeensy()  // KI3P
+{
+  /* Do shutdown stuff. Nothing here yet */
+
+  /* Tell the ATTiny that we have finished shutdown and it's safe to power off */
+  digitalWrite(SHUTDOWN_COMPLETE, 1);
+  delay(100);
+  digitalWrite(SHUTDOWN_COMPLETE, 0);
+}
+
 /*****
   Purpose: Generate Array with variable sinewave frequency tone AFP 05-17-22
   Parameter list:
@@ -629,6 +650,111 @@ void SetBand()
   SetFreq();
   ShowFrequency();
   FilterBandwidth();
+
+  // Set the BPF bands
+  #ifdef V12  // KI3P
+
+  switch (currentBand){
+    //case BAND_160M:
+    //  BPF_GPAB_state = BPF_BAND_160M;
+    //  break;
+    case BAND_80M:
+      BPF_GPAB_state = BPF_BAND_80M;
+      break;
+    //case BAND_60M:
+    //  BPF_GPAB_state = BPF_BAND_60M;
+    //  break;   
+    case BAND_40M:
+      BPF_GPAB_state = BPF_BAND_40M;
+      break;
+    //case BAND_30M:
+    //  BPF_GPAB_state = BPF_BAND_30M;
+    //  break;
+    case BAND_20M:
+      BPF_GPAB_state = BPF_BAND_20M;
+      break;
+    case BAND_17M:
+      BPF_GPAB_state = BPF_BAND_17M;
+      break;
+    case BAND_15M:
+      BPF_GPAB_state = BPF_BAND_15M;
+      break;
+    case BAND_12M:
+      BPF_GPAB_state = BPF_BAND_12M;
+      break;
+    case BAND_10M:
+      BPF_GPAB_state = BPF_BAND_10M;
+      break;
+    case BAND_6M:
+      BPF_GPAB_state = BPF_BAND_6M;
+      break;
+    default:
+      BPF_GPAB_state = BPF_BAND_BYPASS;
+      break;
+  }
+  mcpBPF.writeGPIOAB(BPF_GPAB_state);
+  Debug("Set BPF state: "+String(BPF_GPAB_state,HEX));
+  #endif
+
+  // Set the LPF bands
+  #ifdef K9HZ_LPF  // KI3P
+
+  switch (currentBand){
+    //case BAND_160M:
+    //  LPF_GPB_state = LPF_GPB_state & 0b11110000;
+    //  LPF_GPB_state = LPF_GPB_state | LPF_BAND_160M;
+    //  break;
+    case BAND_80M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_80M;
+      break;
+    //case BAND_60M:
+    //  LPF_GPB_state = LPF_GPB_state & 0b11110000;
+    //  LPF_GPB_state = LPF_GPB_state | LPF_BAND_60M;
+    //  break;   
+    case BAND_40M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_40M;
+      break;
+    //case BAND_30M:
+    //  LPF_GPB_state = LPF_GPB_state & 0b11110000;
+    //  LPF_GPB_state = LPF_GPB_state | LPF_BAND_30M;
+    //  break;
+    case BAND_20M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_20M;
+      break;
+    case BAND_17M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_17M;
+      break;
+    case BAND_15M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_15M;
+      break;
+    case BAND_12M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_12M;
+      break;
+    case BAND_10M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_10M;
+      break;
+    case BAND_6M:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_6M;
+      break;
+    default:
+      LPF_GPB_state = LPF_GPB_state & 0b11110000;
+      LPF_GPB_state = LPF_GPB_state | LPF_BAND_NF;
+      break;
+  }
+  mcpLPF.writeGPIOA(LPF_GPA_state);
+  mcpLPF.writeGPIOB(LPF_GPB_state);
+  Debug("Set LPF GPA state: "+String(LPF_GPA_state,DEC));
+  Debug("Set LPF GPB state: "+String(LPF_GPB_state,DEC));
+  #endif
+
 }
 
 // G0ORX - Split code out ot allow use from other code

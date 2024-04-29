@@ -488,6 +488,38 @@ V046d June 27, 2023  Jack Purdum (W8TEE) and includes changes by Greg:
 #include "SDT.h"
 #endif
 
+#ifdef V12 // KI3P
+  Adafruit_MCP23X17 mcpBPF; // connected to Wire2
+  Adafruit_MCP23X17 mcpRF; // connected to Wire
+  uint16_t BPF_GPAB_state;
+#endif
+
+#ifdef K9HZ_LPF // KI3P
+  Adafruit_MCP23X17 mcpLPF; // connected to Wire2
+  AD7991 swrADC; // on K9HZ LPF board
+  uint8_t LPF_GPB_state;
+  uint8_t LPF_GPA_state;
+
+  // K9HZ LPF board initial state. Set all pins to zero. This puts BPF in the path for both RX and TX
+  #define LPF_STARTUP_STATE_A 0x00
+  // Pin mapping:
+  // GPB0: Band BIT0
+  // GPB1: Band BIT1
+  // GPB2: Band BIT2
+  // GPB3: Band BIT3
+  // GPB4: Antenna BIT0
+  // GPB5: Antenna BIT1
+  // GPB6: XVTR_SEL (1 means no XVTR)
+  // GPB7: 100W_PA_SEL (0 means no 100W)
+  // Default state: NOFILT Ant0  No XVTR  No 100W PA
+  // Default state: NOFILT Ant0  No XVTR  No 100W PA
+  #ifndef KI3PMODS
+  #define LPF_STARTUP_STATE_B 0b01001111
+  #else
+  #define LPF_STARTUP_STATE_B 0b01100111
+  #endif
+#endif
+
 #if defined(G0ORX_FRONTPANEL) || defined(G0ORX_FRONTPANEL_2) || defined(G0ORX_CAT)
 int my_ptt=HIGH;  // Active LOW
 
@@ -2554,6 +2586,12 @@ void setup() {
   sgtl5000_1.micGain(1);
   sgtl5000_1.lineInLevel(4);
   sgtl5000_1.lineOutLevel(20);
+
+  // Configure the pins for the auto shutdown
+  pinMode(BEGIN_TEENSY_SHUTDOWN, INPUT); // positive pulse tells Teensy to start shutdown routine
+  pinMode(SHUTDOWN_COMPLETE, OUTPUT);
+  digitalWrite(SHUTDOWN_COMPLETE,0); // positive pulse completes shutdown
+
 #else
   sgtl5000_1.micGain(20);
   sgtl5000_1.lineInLevel(0);
@@ -2569,9 +2607,18 @@ void setup() {
   pinMode(FILTERPIN40M, OUTPUT);
   pinMode(FILTERPIN80M, OUTPUT);
   pinMode(RXTX, OUTPUT);
-  pinMode(MUTE, OUTPUT);
-  digitalWrite(MUTE, LOW);
+  //pinMode(MUTE, OUTPUT); // KI3P
+  //digitalWrite(MUTE, LOW); // KI3P
   pinMode(PTT, INPUT_PULLUP);
+  // KI3P
+  pinMode(CAL, OUTPUT);     // CAL pin. HIGH = Calibration mode. LOW = normal mode.
+  pinMode(XMITMODE, OUTPUT);// XMit mode. HIGH = SSB. LOW = CW
+  pinMode(CWCONT, OUTPUT);  // CW control. HIGH = CW on. LOW = CW off.
+  digitalWrite(CAL, LOW);
+  digitalWrite(XMITMODE, HIGH);
+  digitalWrite(CWCONT, LOW);
+  // end KI3P
+
 #if !(defined(G0ORX_FRONTPANEL) || defined(G0ORX_FRONTPANEL_2))
   pinMode(BUSY_ANALOG_PIN, INPUT);
   pinMode(FILTER_ENCODER_A, INPUT);
@@ -2789,6 +2836,75 @@ void setup() {
   si5351.output_enable(SI5351_CLK2, 0);                  //AFP 09-24-23 V12
 #endif
 
+
+  #ifdef V12 // KI3P
+  /**********************************************************************
+   * Set up the BPF which is connected via the BANDS connector on Wire2 *
+   **********************************************************************/
+  Wire2.setClock(100000UL);
+  Wire2.begin(); // BANDS is on Wire2
+
+  if (mcpBPF.begin_I2C(BPF_ADDR,&Wire2)){
+    mcpBPF.enableAddrPins();
+    // Set all pins to be outputs
+    for (int i=0;i<16;i++){
+      mcpBPF.pinMode(i, OUTPUT);
+    }
+    // Set to BYPASS for startup.
+    BPF_GPAB_state = BPF_BAND_BYPASS;
+    mcpBPF.writeGPIOAB(BPF_GPAB_state); 
+  } else {
+    ShowMessageOnWaterfall("BPF MCP23017 not found at 0x"+String(BPF_ADDR,HEX));
+  }
+
+  /***********************************************************************
+   * Set up the RF board which is connected via the RF Control connector *
+   ***********************************************************************/
+  Wire.setClock(100000UL);
+  Wire.begin(); // RF Control is on Wire
+  if (!mcpRF.begin_I2C(RF_BOARD_MCP23017_ADDR, &Wire)){
+    ShowMessageOnWaterfall("RF Board MCP23017 not found at 0x"+String(RF_BOARD_MCP23017_ADDR,HEX));
+  }
+  mcpRF.enableAddrPins();
+  // Set all pins to be outputs
+  for (int i=0;i<16;i++){
+    mcpRF.pinMode(i, OUTPUT);
+  }
+  // Set all pins to zero. This means no attenuation and in HF mode
+  mcpRF.writeGPIOA(0x00); 
+  mcpRF.writeGPIOB(0x00); 
+
+  #endif
+
+  #ifdef K9HZ_LPF // KI3P
+  /******************************************************************
+   * Set up the K9HZ LPF which is connected via the BANDS connector *
+   ******************************************************************/
+  if (mcpLPF.begin_I2C(K9HZ_LPF_ADDR,&Wire2)){
+    mcpLPF.enableAddrPins();
+    // Set all pins to be outputs
+    for (int i=0;i<16;i++){
+      mcpLPF.pinMode(i, OUTPUT);
+    }
+    LPF_GPA_state = LPF_STARTUP_STATE_A;
+    mcpLPF.writeGPIOA(LPF_GPA_state); 
+    LPF_GPB_state = LPF_STARTUP_STATE_B;
+    mcpLPF.writeGPIOB(LPF_GPB_state); 
+    Debug("Startup LPF GPB state: "+String(LPF_GPB_state,DEC));
+  } else {
+    ShowMessageOnWaterfall("LPF MCP23017 not found at 0x"+String(K9HZ_LPF_ADDR,HEX));
+  }
+  // This is the ADC module for the SWR meter
+  if (!swrADC.begin(AD7991_I2C_ADDR1,&Wire2)){
+    ShowMessageOnWaterfall("AD7991 not found at 0x"+String(AD7991_I2C_ADDR1,HEX));
+
+    if (!swrADC.begin(AD7991_I2C_ADDR2,&Wire2)){
+      ShowMessageOnWaterfall("AD7991 found at alternative 0x"+String(AD7991_I2C_ADDR2,HEX));
+    }
+  }
+
+  #endif
+
 }
 //============================================================== END setup() =================================================================
 //===============================================================================================================================
@@ -2817,6 +2933,11 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
   bool dah = false;
   bool send_dit = false;
   bool send_dah = false;
+
+  // KI3P: Check for signal to begin shutdown. This should be done with an ISR instead.
+  if (digitalRead(BEGIN_TEENSY_SHUTDOWN) == HIGH){
+    ShutdownTeensy();
+  }
 
 #ifdef G0ORX_CAT
   CATSerialEvent();
@@ -2854,7 +2975,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
   switch (radioState) {
     case (SSB_RECEIVE_STATE):
       if (lastState != radioState) {  // G0ORX 01092023
-        digitalWrite(MUTE, LOW);      // Audio Mute off
+        //digitalWrite(MUTE, LOW);      // Audio Mute off // KI3P
         modeSelectInR.gain(0, 1);
         modeSelectInL.gain(0, 1);
         digitalWrite(RXTX, LOW);  //xmit off
@@ -2897,7 +3018,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
 #endif
       xrState = TRANSMIT_STATE;
       // centerTuneFlag = 1;  Not required with revised tuning scheme.  KF5N July 22, 2023
-      digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute)
+      //digitalWrite(MUTE, HIGH);  //  Mute Audio  (HIGH=Mute) // KI3P
       digitalWrite(RXTX, HIGH);  //xmit on
       xrState = TRANSMIT_STATE;
       modeSelectInR.gain(0, 0);
@@ -2958,7 +3079,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
   switch (radioState) {
     case CW_RECEIVE_STATE:
       if (lastState != radioState) {  // G0ORX 01092023
-        digitalWrite(MUTE, LOW);      //turn off mute
+        //digitalWrite(MUTE, LOW);      //turn off mute // KI3P
         T41State = CW_RECEIVE;
         ShowTransmitReceiveStatus();
 #ifdef G0ORX_AUDIO_DISPLAY
@@ -2987,7 +3108,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
       CW_ExciterIQData();
       xrState = TRANSMIT_STATE;
       ShowTransmitReceiveStatus();
-      digitalWrite(MUTE, HIGH);  //   Mute Audio  (HIGH=Mute)
+      //digitalWrite(MUTE, HIGH);  //   Mute Audio  (HIGH=Mute) // KI3P
       modeSelectInR.gain(0, 0);
       modeSelectInL.gain(0, 0);
       modeSelectInExR.gain(0, 0);
@@ -3002,7 +3123,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
           cwTimer = millis();                                      //Reset timer
           modeSelectOutExL.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
           modeSelectOutExR.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
-          digitalWrite(MUTE, LOW);                                 // unmutes audio
+          //digitalWrite(MUTE, LOW);                                 // unmutes audio // KI3P
           modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);  // Sidetone  AFP 10-01-22
 #ifdef G0ORX_AUDIO_DISPLAY 
           ShowTXAudio();
@@ -3010,7 +3131,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
         } else {
           if (digitalRead(paddleDit) == HIGH && keyType == 0) {  //Turn off CW signal
             keyPressedOn = 0;
-            digitalWrite(MUTE, HIGH);     // mutes audio
+            //digitalWrite(MUTE, HIGH);     // mutes audio // KI3P
             modeSelectOutExL.gain(0, 0);  //Power = 0
             modeSelectOutExR.gain(0, 0);
             modeSelectOutL.gain(1, 0);  // Sidetone off
@@ -3031,7 +3152,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
       CW_ExciterIQData();
       xrState = TRANSMIT_STATE;
       ShowTransmitReceiveStatus();
-      digitalWrite(MUTE, HIGH);  //   Mute Audio  (HIGH=Mute)
+      //digitalWrite(MUTE, HIGH);  //   Mute Audio  (HIGH=Mute) // KI3P
       modeSelectInR.gain(0, 0);
       modeSelectInL.gain(0, 0);
       modeSelectInExR.gain(0, 0);
@@ -3080,7 +3201,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
           while (millis() - ditTimerOn <= transmitDitLength) {       // JJP 8/19/23
             modeSelectOutExL.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
             modeSelectOutExR.gain(0, powerOutCW[currentBand]);       //AFP 10-21-22
-            digitalWrite(MUTE, LOW);                                 // unmutes audio
+            //digitalWrite(MUTE, LOW);                                 // unmutes audio // KI3P
             modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);  // Sidetone
                                                                      //  modeSelectOutR.gain(1, volumeLog[(int)sidetoneVolume]);           // Right side not used.  KF5N September 1, 2023
             CW_ExciterIQData();                                      // Creates CW output signal
@@ -3109,7 +3230,7 @@ FASTRUN void loop()  // Replaced entire loop() with Greg's code  JJP  7/14/23
             while (millis() - dahTimerOn <= 3UL * transmitDitLength) {  // JJP 8/19/23
               modeSelectOutExL.gain(0, powerOutCW[currentBand]);        //AFP 10-21-22
               modeSelectOutExR.gain(0, powerOutCW[currentBand]);        //AFP 10-21-22
-              digitalWrite(MUTE, LOW);                                  // unmutes audio
+              //digitalWrite(MUTE, LOW);                                  // unmutes audio // KI3P
               modeSelectOutL.gain(1, volumeLog[(int)sidetoneVolume]);   // Dah sidetone was using constants.  KD0RC
 //                                                                      // modeSelectOutR.gain(1, volumeLog[(int)sidetoneVolume]);           // Right side not used.  KF5N September 1, 2023
               CW_ExciterIQData();                                       // Creates CW output signal
